@@ -21,6 +21,6 @@ VECTOR_DB_PATH = str(BACKEND_ROOT / "data" / "chroma_db")
 
 # Processing settings
 MAX_COLLEGES = None  # Process all colleges
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 200
-SIMILARITY_K = 4  # Number of similar documents to retrieve
+CHUNK_SIZE = 400
+CHUNK_OVERLAP = 100
+SIMILARITY_K = 15  # High recall for reranking

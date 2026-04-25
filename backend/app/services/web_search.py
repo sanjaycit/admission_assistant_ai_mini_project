@@ -5,6 +5,15 @@ import urllib.parse as urlparse
 
 def normalize_query(query: str) -> str:
     """Normalize and expand the user query for web search."""
+    clean = query.strip().lower()
+    
+    # Query expansion for financial queries
+    if any(word in clean for word in ["fee", "cost", "tuition", "price"]):
+        # Append related synonyms to cast a wider net
+        expanded = f"{query.strip()} tuition fee cost"
+        print(f"  [EXPAND] Expanded query to: '{expanded}'")
+        return expanded
+        
     return query.strip()
 
 def search_web(query: str, num_results: int = 3) -> List[Dict]:
