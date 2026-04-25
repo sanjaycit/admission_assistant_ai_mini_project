@@ -13,8 +13,9 @@ TIMEOUT = 10
 
 # LLM settings
 EMBED_MODEL = "nomic-embed-text"  # Ollama — stays local for embeddings
-# LLM_MODEL = "gemma:2b"          # Ollama local model (too small for grounding)
-GEMINI_MODEL = "gemini-2.0-flash"  # Google Gemini — used for answer generation
+# LLM_MODEL = "gemma:2b"               # Ollama local model (too small for grounding)
+# GEMINI_MODEL = "gemini-2.0-flash"    # quota exhausted on free tier
+GEMINI_MODEL = "gemini-2.5-flash"  # works on v1beta endpoint langchain uses
 
 # File paths
 DEFAULT_CSV_PATH = str(BACKEND_ROOT / "data" / "raw" / "colleges_chennai.csv")

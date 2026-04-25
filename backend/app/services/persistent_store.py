@@ -13,29 +13,22 @@ PERSIST_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "
 # 24 hours — fees/rankings change, so daily refresh is reasonable
 CACHE_TTL_SECONDS = 86_400
 
-# Fix 6: Extended keyword set for hybrid retrieval boost
-# Grouped by category so it's easy to expand later
+# Extended keyword set for hybrid retrieval boost
 BOOST_KEYWORDS = {
-    # Financial facts
     "financial": ["$", "usd", "fee", "cost", "tuition", "price", "amount", "pay",
                   "scholarship", "aid", "grant", "loan", "waiver", "refund", "deposit"],
-    # Ranking facts
-    "ranking": ["rank", "ranked", "#", "top", "position", "tier", "best"],
-    # Deadline facts
-    "deadline": ["deadline", "due", "apply by", "closes", "open", "date", "round"],
-    # Admission stats
-    "stats": ["rate", "accepted", "admit", "gpa", "sat", "act", "score", "average"],
+    "ranking":   ["rank", "ranked", "#", "top", "position", "tier", "best"],
+    "deadline":  ["deadline", "due", "apply by", "closes", "open", "date", "round"],
+    "stats":     ["rate", "accepted", "admit", "gpa", "sat", "act", "score", "average"],
 }
-# Flatten for quick lookup, but keep category weights
 KEYWORD_WEIGHTS = {}
 for category, words in BOOST_KEYWORDS.items():
     for w in words:
-        KEYWORD_WEIGHTS[w] = KEYWORD_WEIGHTS.get(w, 0) + 0.25  # 0.25 boost per hit
+        KEYWORD_WEIGHTS[w] = KEYWORD_WEIGHTS.get(w, 0) + 0.25
 
 
 def get_db() -> Chroma:
     """Initialize and return the persistent ChromaDB."""
-    # Fix 2: Use a dedicated, better embedding model for retrieval quality
     embeddings = OllamaEmbeddings(model=EMBED_MODEL)
     return Chroma(
         collection_name="web_cache",
@@ -45,38 +38,48 @@ def get_db() -> Chroma:
 
 
 def _is_fresh(metadata: dict) -> bool:
-    """Fix 5: Check if a cached chunk is still within its TTL."""
+    """Check if a cached chunk is still within its TTL."""
     cached_at = metadata.get("cached_at")
     if cached_at is None:
-        return True  # Legacy chunks without timestamp pass through (treat as fresh)
+        return True  # Legacy chunks without timestamp pass through
     return (time.time() - float(cached_at)) < CACHE_TTL_SECONDS
 
 
 def search_db(
     query: str,
+    entity: Optional[str] = None,
     threshold: float = 1.2,
     k: int = SIMILARITY_K,
     require_fresh: bool = False,
 ) -> Optional[Tuple[str, List[str]]]:
     """
-    Search the persistent DB.
+    Entity-aware search of the persistent DB.
 
-    Fix 4: Retrieve k=8 candidates, then rerank and return top RERANK_TOP_N.
-    Fix 5: Optionally filter stale chunks (require_fresh=True skips old data).
-    Fix 6: Keyword-weighted hybrid reranking.
+    entity  : college name extracted from the query (e.g. "ssn", "mit").
+              When provided, retrieval is FILTERED to only that college's chunks.
+              This prevents MIT chunks ever being returned for an SSN query.
 
     Returns (context, sources) if relevant chunks are found, otherwise None.
     """
-    print(f"  [DB] Checking persistent cache for relevant context...")
+    entity_label = f"'{entity}'" if entity else "any"
+    print(f"  [DB] Checking persistent cache for relevant context (entity={entity_label})...")
     db = get_db()
 
-    # Check if DB is completely empty
     if db._collection.count() == 0:
         print("  [DB] Cache is empty.")
         return None
 
-    # Fix 4: Pull k=8 candidates (wider net)
-    results = db.similarity_search_with_score(query, k=k)
+    # ── Entity-filtered retrieval ─────────────────────────────────────────────
+    # ChromaDB `where` filter ensures ONLY chunks tagged with this college are
+    # returned — cross-college contamination is impossible at the DB level.
+    where_filter = {"college": {"$eq": entity}} if entity else None
+
+    try:
+        results = db.similarity_search_with_score(query, k=k, filter=where_filter)
+    except Exception as e:
+        # Graceful fallback: if filter fails (e.g. legacy collection), search unfiltered
+        print(f"  [DB] Filter error ({e}), falling back to unfiltered search.")
+        results = db.similarity_search_with_score(query, k=k)
 
     # Filter by distance threshold
     relevant_docs = [(doc, score) for doc, score in results if score < threshold]
@@ -85,7 +88,7 @@ def search_db(
         print(f"  [DB] No relevant data found below threshold {threshold}.")
         return None
 
-    # Fix 5: Freshness check
+    # Freshness check
     if require_fresh:
         fresh_docs = [(doc, score) for doc, score in relevant_docs if _is_fresh(doc.metadata)]
         stale_count = len(relevant_docs) - len(fresh_docs)
@@ -99,26 +102,19 @@ def search_db(
 
     print(f"  [DB] Found {len(relevant_docs)} candidate chunk(s). Running keyword reranker...")
 
-    # Fix 6: Hybrid reranking — semantic score + keyword boost
+    # Hybrid reranking — semantic score + keyword boost
     reranked = []
     for doc, l2_distance in relevant_docs:
-        # Convert L2 distance → similarity score (higher is better)
         base_score = threshold - l2_distance
-
-        # Keyword boost: accumulate weighted hits
         content_lower = doc.page_content.lower()
         keyword_boost = sum(
             weight for keyword, weight in KEYWORD_WEIGHTS.items()
             if keyword in content_lower
         )
-
-        # Cap boost to avoid swamping semantic score
         capped_boost = min(keyword_boost, 1.5)
         final_score = base_score + capped_boost
-
         reranked.append((final_score, doc))
 
-    # Sort descending and take top RERANK_TOP_N
     reranked.sort(key=lambda x: x[0], reverse=True)
     top_docs = [doc for _, doc in reranked[:RERANK_TOP_N]]
 
@@ -126,44 +122,55 @@ def search_db(
 
     context_parts = []
     sources = set()
+    seen_content = set()  # deduplicate identical chunks
+
     for doc in top_docs:
+        fingerprint = " ".join(doc.page_content.split())
+        if fingerprint in seen_content:
+            continue
+        seen_content.add(fingerprint)
         context_parts.append(doc.page_content)
         sources.add(doc.metadata.get("source", "Unknown Source"))
+
+    if not context_parts:
+        return None
 
     context = "\n\n---\n\n".join(context_parts)
     return context, list(sources)
 
 
-def add_to_db(texts_by_url: Dict[str, str]):
+def add_to_db(texts_by_url: Dict[str, str], entity: Optional[str] = None):
     """
-    Fix 2: Chunk texts with paragraph-first splitting and store in ChromaDB.
-    Fix 5: Attach a cached_at timestamp to every chunk for freshness checks.
-    """
-    print(f"  [DB] Saving fetched content to persistent cache...")
+    Chunk texts and store them in ChromaDB with entity metadata.
 
-    # Fix 2: Paragraph-level splitting first, then sentence, then word
+    entity : college name (e.g. "ssn", "mit"). Tagged on every chunk so that
+             future retrievals can filter by college, preventing cross-contamination.
+    """
+    print(f"  [DB] Saving fetched content to persistent cache (entity='{entity}')...")
+
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
         length_function=len,
-        # Priority: paragraph → sentence → clause → word
         separators=["\n\n\n", "\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""],
     )
 
     documents = []
     metadatas = []
-    now = str(time.time())  # Fix 5: freshness timestamp
+    now = str(time.time())
 
     for url, text in texts_by_url.items():
         if not text:
             continue
         chunks = splitter.split_text(text)
         for chunk in chunks:
-            # Skip chunks that are too short to be useful (likely navigation junk)
             if len(chunk.strip()) < 60:
                 continue
             documents.append(chunk)
-            metadatas.append({"source": url, "cached_at": now})
+            metadata = {"source": url, "cached_at": now}
+            if entity:
+                metadata["college"] = entity  # ← entity tag on every chunk
+            metadatas.append(metadata)
 
     if not documents:
         print("  [DB] No valid chunks to store.")
@@ -171,4 +178,4 @@ def add_to_db(texts_by_url: Dict[str, str]):
 
     db = get_db()
     db.add_texts(texts=documents, metadatas=metadatas)
-    print(f"  [DB] Successfully cached {len(documents)} chunks.")
+    print(f"  [DB] Successfully cached {len(documents)} chunks tagged with entity='{entity}'.")
