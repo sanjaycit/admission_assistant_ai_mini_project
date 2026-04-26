@@ -31,6 +31,61 @@ SUFFICIENCY_SIGNALS = {
     "acceptance": ["rate", "%", "percent", "accepted", "applicants"],
 }
 
+# ---------------------------------------------------------------------------
+# Alias map — fused abbreviations → canonical compound entity key
+# Used by extract_query_entities to normalise user shorthand BEFORE regex.
+# Keys are lowercase; values are the canonical form stored in the cache.
+# ---------------------------------------------------------------------------
+COLLEGE_ALIASES: dict[str, str] = {
+    # IIT campuses
+    "iitb":    "iit bombay",
+    "iitm":    "iit madras",
+    "iitd":    "iit delhi",
+    "iitk":    "iit kanpur",
+    "iitkgp":  "iit kharagpur",
+    "iitg":    "iit guwahati",
+    "iitr":    "iit roorkee",
+    "iith":    "iit hyderabad",
+    "iiti":    "iit indore",
+    "iitbbs":  "iit bhubaneswar",
+    "iitbhu":  "iit bhu",
+    "iitmandi":"iit mandi",
+    # NIT campuses
+    "nitk":    "nit karnataka",
+    "nitt":    "nit trichy",
+    "nitr":    "nit rourkela",
+    "nitp":    "nit patna",
+    "nitw":    "nit warangal",
+    "nitc":    "nit calicut",
+    # Other common colleges
+    "vitc":    "vit chennai",
+    "vitv":    "vit vellore",
+    "srmktr":  "srm kattankulathur",
+    "bitsphd": "bits pilani",
+    "bitsh":   "bits hyderabad",
+    "bitsg":   "bits goa",
+}
+
+
+def resolve_aliases(query_lower: str) -> tuple[list[str], set[str]]:
+    """
+    Scan every whitespace-separated token in the lowercased query against
+    COLLEGE_ALIASES.  Returns:
+      - found:    canonical entity keys resolved from aliases
+      - consumed: original tokens that were matched (so regex steps skip them)
+    """
+    found: list[str] = []
+    consumed: set[str] = set()
+    for token in query_lower.split():
+        canonical = COLLEGE_ALIASES.get(token)
+        if canonical and canonical not in found:
+            found.append(canonical)
+            consumed.add(token)
+            # Also consume the individual words of the canonical form so
+            # they don't get re-added as separate entities later.
+            consumed.update(canonical.split())
+    return found, consumed
+
 
 def is_volatile_query(query: str) -> bool:
     """
@@ -43,16 +98,16 @@ def is_volatile_query(query: str) -> bool:
 
 def extract_query_entities(query: str) -> list[str]:
     """
-    Extract ALL college/institution names from the query.
+    Extract ALL college/institution names from the query as compound entities.
 
-    Unlike the old single-entity version, this returns a list so comparison
-    queries like 'Compare MIT and SSN' yield ['mit', 'ssn'].
-
-    Strategy (applied in order, results accumulated):
-      1. ALL-CAPS acronyms 2+ chars  →  SSN, MIT, IIT, NIT, BITS, VIT
-      2. Word(s) before University/College/Institute
-         e.g. 'Stanford University' → 'stanford'
-      3. Remaining capitalized words not in stop list
+    Strategy (applied in order):
+      0. Compound ACRONYM + qualifier  →  'IIT Bombay' → 'iit bombay',
+                                          'NIT Trichy'  → 'nit trichy'
+         These are detected FIRST so that standalone acronym scan doesn't
+         split 'IIT Bombay' into separate 'iit' and 'bombay' entries.
+      1. Remaining standalone ALL-CAPS acronyms not consumed by step 0
+      2. Word(s) before University/College/Institute  → 'stanford'
+      3. Remaining capitalized proper nouns not consumed by step 0
     """
     import re
 
@@ -63,12 +118,27 @@ def extract_query_entities(query: str) -> list[str]:
         "university", "college", "institute", "school",
     }
 
-    found = []  # preserves insertion order, no duplicates
+    # ── Step -1: alias resolution (case-insensitive, handles 'iitb', 'IITB', etc.) ──
+    found, consumed = resolve_aliases(query.lower())
 
-    # 1. ALL-CAPS acronyms: SSN, MIT, IIT, etc.
+    # ── Step 0: Compound ACRONYM + Title-case qualifier in ORIGINAL query ────
+    #    Handles mixed-case input like 'IIT Bombay' that aliases don't cover.
+    #    Matches: "IIT Bombay", "IIT Madras", "NIT Trichy", "BITS Pilani"
+    #    Qualifier must NOT be a stop word (filters out "IIT College" etc.)
+    for m in re.finditer(r'\b([A-Z]{2,})\s+([A-Z][a-z]{2,})\b', query):
+        acronym, qualifier = m.group(1), m.group(2)
+        acr_key, q_key = acronym.lower(), qualifier.lower()
+        if q_key not in STOP_WORDS:
+            key = f"{acr_key} {q_key}"   # e.g. 'iit bombay'
+            if key not in found:
+                found.append(key)
+            consumed.add(acr_key)
+            consumed.add(q_key)
+
+    # ── Step 1: Standalone ALL-CAPS acronyms not already consumed ────────────
     for acr in re.findall(r'\b[A-Z]{2,}\b', query):
         key = acr.lower()
-        if key not in STOP_WORDS and key not in found:
+        if key not in STOP_WORDS and key not in found and key not in consumed:
             found.append(key)
 
     # 2. Name(s) directly before University / College / Institute / School
@@ -80,10 +150,10 @@ def extract_query_entities(query: str) -> list[str]:
         if key not in STOP_WORDS and key not in found:
             found.append(key)
 
-    # 3. Any remaining capitalized proper nouns
+    # 3. Remaining capitalized proper nouns not consumed by step 0
     for w in re.findall(r'\b[A-Z][a-z]{2,}\b', query):
         key = w.lower()
-        if key not in STOP_WORDS and key not in found:
+        if key not in STOP_WORDS and key not in found and key not in consumed:
             found.append(key)
 
     return found
@@ -183,7 +253,7 @@ Extract numbers, dollar amounts, and figures exactly as written.
 
 
 def _resolve_entity_context(
-    entity: str,
+    entity: str | None,
     clean_query: str,
 ) -> tuple[str, list[str]] | None:
     """
@@ -194,24 +264,28 @@ def _resolve_entity_context(
     cached = search_db(clean_query, entity=entity, threshold=1.2,
                        k=SIMILARITY_K, require_fresh=True)
 
+    label = entity.upper() if entity else "UNKNOWN"
+
     if cached:
         ctx, srcs = cached
         if is_context_sufficient(clean_query, ctx):
-            print(f"  [ROUTER][{entity.upper()}] Cache hit — using stored data.")
+            print(f"  [ROUTER][{label}] Cache hit — using stored data.")
             return ctx, srcs
         else:
-            print(f"  [ROUTER][{entity.upper()}] Cache insufficient — going to web.")
+            print(f"  [ROUTER][{label}] Cache insufficient — going to web.")
             cached = None
 
     if not cached:
-        print(f"  [ROUTER][{entity.upper()}] Fetching from web...")
-        # Build a targeted search query: entity name + original intent
-        targeted_query = f"{entity} {clean_query}"
+        print(f"  [ROUTER][{label}] Fetching from web...")
+        # Prefix the search with the entity name when known; if entity is None
+        # (user typed an unknown name in lowercase) just use the raw query —
+        # it already contains enough signal for the search engine.
+        targeted_query = f"{entity} {clean_query}" if entity else clean_query
         results = search_web(targeted_query, num_results=5)
         urls = [r["url"] for r in results if r.get("url")]
 
         if not urls:
-            print(f"  [ROUTER][{entity.upper()}] No URLs found.")
+            print(f"  [ROUTER][{label}] No URLs found.")
             return None
 
         try:
