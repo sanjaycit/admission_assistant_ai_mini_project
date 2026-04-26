@@ -24,8 +24,8 @@ QUERY_EXPANSIONS = {
     "requirements":  ["eligibility", "criteria", "qualifications", "prerequisites"],
     "how to apply":  ["application process", "admission steps", "application procedure"],
     # Rankings
-    "ranking":       ["world ranking", "national ranking", "university rank", "#1", "top"],
-    "rank":          ["ranking", "position", "top universities", "best colleges"],
+    "ranking":       ["rank", "position", "university rank"],
+    "rank":          ["ranking", "position", "university rank"],
     # Admissions process
     "admission":     ["admission process", "application", "enrollment", "requirements"],
     # Scores / Stats
