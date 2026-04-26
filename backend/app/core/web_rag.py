@@ -89,7 +89,7 @@ def resolve_aliases(query_lower: str) -> tuple[list[str], set[str]]:
 
 def is_volatile_query(query: str) -> bool:
     """
-    Fix 5: Determine whether the query requires fresh web data.
+    Determine whether the query requires fresh web data.
     Volatile queries bypass the cache entirely so stale info never reaches the LLM.
     """
     lower = query.lower()

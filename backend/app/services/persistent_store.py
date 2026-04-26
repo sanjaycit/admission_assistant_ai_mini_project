@@ -3,7 +3,8 @@ import time
 from typing import Dict, Tuple, List, Optional
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
+# from langchain_ollama import OllamaEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from app.core.config import EMBED_MODEL, SIMILARITY_K, CHUNK_SIZE, CHUNK_OVERLAP, RERANK_TOP_N
 
 # Define persistent storage path
@@ -29,7 +30,8 @@ for category, words in BOOST_KEYWORDS.items():
 
 def get_db() -> Chroma:
     """Initialize and return the persistent ChromaDB."""
-    embeddings = OllamaEmbeddings(model=EMBED_MODEL)
+    # embeddings = OllamaEmbeddings(model=EMBED_MODEL)
+    embeddings = GoogleGenerativeAIEmbeddings(model=EMBED_MODEL)
     return Chroma(
         collection_name="web_cache",
         embedding_function=embeddings,
