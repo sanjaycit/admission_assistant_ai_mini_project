@@ -213,22 +213,78 @@ def is_context_sufficient(query: str, context: str) -> bool:
     return False
 
 
+
+# Keywords that indicate the user wants a structured process/checklist answer
+CHECKLIST_KEYWORDS = [
+    "eligib", "document", "required", "checklist", "steps", "how to apply",
+    "process", "procedure", "what do i need", "criteria",
+    "requirement", "deadline", "when to apply", "admission process",
+]
+
+
+def _is_checklist_query(query: str) -> bool:
+    """Detect whether the user wants a step-by-step / structured answer."""
+    lower = query.lower()
+    return any(kw in lower for kw in CHECKLIST_KEYWORDS)
+
+
 def generate_answer(query: str, context: str) -> str:
-    """Generate final answer using Gemini via LangChain."""
+    """Generate final answer using Gemini via LangChain.
+
+    Intent-aware: produces structured markdown (headings, checkboxes, numbered
+    steps) for process/eligibility/document queries, and concise 2-3 sentence
+    answers for factual queries (fees, rankings, etc.).
+    """
     print(f"  [GENERATE] Generating answer from {len(context)} chars of context...")
     print(f"  [CONTEXT PREVIEW]\n{context[:800]}\n  [... end preview ...]")
 
-    load_dotenv()  # loads GOOGLE_API_KEY from backend/.env
+    load_dotenv()
     llm = ChatGoogleGenerativeAI(
         model=GEMINI_MODEL,
         temperature=0.0,
         google_api_key=os.getenv("GOOGLE_API_KEY"),
     )
 
-    # Small models like gemma:2b ignore vague instructions like "use only context".
-    # Instead: explicitly extract relevant fragments, then tell it to use THOSE.
-    # This two-step approach (extract → answer) works much better on <7B models.
-    prompt = f"""### TASK
+    if _is_checklist_query(query):
+        prompt = f"""### TASK
+Read the CONTEXT below and answer the QUESTION with a well-structured guide.
+Use only information present in the context.
+
+### CONTEXT
+{context}
+
+### QUESTION
+{query}
+
+### RULES
+Structure your answer using only the relevant sections below:
+
+## Eligibility Criteria
+(bullet list of minimum qualifications)
+
+## Required Documents
+- [ ] Document 1
+- [ ] Document 2
+(use "- [ ]" prefix for every document so the user can check them off)
+
+## Key Deadlines
+(bullet list of important dates with labels)
+
+## Steps to Apply
+1. Step one
+2. Step two
+(numbered, action-oriented steps in order)
+
+## Additional Notes
+(any important tips or warnings — optional)
+
+- Use **bold** for important terms.
+- Omit any section the context has no data for.
+- Do NOT add caveats or say you don't know.
+
+### ANSWER"""
+    else:
+        prompt = f"""### TASK
 Read the CONTEXT below and answer the QUESTION.
 The context is from a trusted web source and contains the correct answer.
 Do NOT say you don't have information — the answer IS in the context.
@@ -250,6 +306,8 @@ Extract numbers, dollar amounts, and figures exactly as written.
 
     response = llm.invoke(prompt)
     return response.content
+
+
 
 
 def _resolve_entity_context(

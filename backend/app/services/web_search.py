@@ -13,15 +13,21 @@ QUERY_EXPANSIONS = {
     "tuition":       ["tuition fee", "cost", "annual fee", "semester fee"],
     "price":         ["cost", "fee", "tuition", "amount"],
     "scholarship":   ["scholarship", "financial aid", "grant", "merit aid", "funding"],
-    # Deadlines
+    # Deadlines — only trigger on explicit deadline words, NOT on "apply"
     "deadline":      ["application deadline", "due date", "last date", "closing date"],
-    "apply":         ["application deadline", "admission deadline", "due date"],
+    "due date":      ["deadline", "last date", "closing date"],
+    # Documents / eligibility
+    "document":      ["required documents", "application documents", "supporting documents",
+                      "certificates", "transcripts", "checklist"],
+    "eligib":        ["eligibility criteria", "minimum qualifications", "requirements",
+                      "who can apply"],
+    "requirements":  ["eligibility", "criteria", "qualifications", "prerequisites"],
+    "how to apply":  ["application process", "admission steps", "application procedure"],
     # Rankings
     "ranking":       ["world ranking", "national ranking", "university rank", "#1", "top"],
     "rank":          ["ranking", "position", "top universities", "best colleges"],
     # Admissions process
     "admission":     ["admission process", "application", "enrollment", "requirements"],
-    "requirements":  ["eligibility", "criteria", "qualifications", "prerequisites"],
     # Scores / Stats
     "gpa":           ["grade point average", "minimum gpa", "academic requirement"],
     "sat":           ["sat score", "standardized test", "admission test", "score requirement"],
