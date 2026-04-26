@@ -5,7 +5,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 # from langchain_ollama import OllamaEmbeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from app.core.config import EMBED_MODEL, SIMILARITY_K, CHUNK_SIZE, CHUNK_OVERLAP, RERANK_TOP_N
+from app.core.config import EMBED_MODEL, SIMILARITY_K, CHUNK_SIZE, CHUNK_OVERLAP, RERANK_TOP_N, GEMINI_MODEL
+from app.services.llm_service import llm_rerank
 
 # Define persistent storage path
 PERSIST_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "chroma_cache")
@@ -13,19 +14,6 @@ PERSIST_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "
 # Freshness: cached chunks older than this (in seconds) are considered stale
 # 24 hours — fees/rankings change, so daily refresh is reasonable
 CACHE_TTL_SECONDS = 86_400
-
-# Extended keyword set for hybrid retrieval boost
-BOOST_KEYWORDS = {
-    "financial": ["$", "usd", "fee", "cost", "tuition", "price", "amount", "pay",
-                  "scholarship", "aid", "grant", "loan", "waiver", "refund", "deposit"],
-    "ranking":   ["rank", "ranked", "#", "top", "position", "tier", "best"],
-    "deadline":  ["deadline", "due", "apply by", "closes", "open", "date", "round"],
-    "stats":     ["rate", "accepted", "admit", "gpa", "sat", "act", "score", "average"],
-}
-KEYWORD_WEIGHTS = {}
-for category, words in BOOST_KEYWORDS.items():
-    for w in words:
-        KEYWORD_WEIGHTS[w] = KEYWORD_WEIGHTS.get(w, 0) + 0.25
 
 
 def get_db() -> Chroma:
@@ -102,23 +90,11 @@ def search_db(
         print("  [DB] All cached chunks are stale. Proceeding to web search.")
         return None
 
-    print(f"  [DB] Found {len(relevant_docs)} candidate chunk(s). Running keyword reranker...")
+    print(f"  [DB] Found {len(relevant_docs)} candidate chunk(s). Running LLM reranker...")
 
-    # Hybrid reranking — semantic score + keyword boost
-    reranked = []
-    for doc, l2_distance in relevant_docs:
-        base_score = threshold - l2_distance
-        content_lower = doc.page_content.lower()
-        keyword_boost = sum(
-            weight for keyword, weight in KEYWORD_WEIGHTS.items()
-            if keyword in content_lower
-        )
-        capped_boost = min(keyword_boost, 1.5)
-        final_score = base_score + capped_boost
-        reranked.append((final_score, doc))
-
-    reranked.sort(key=lambda x: x[0], reverse=True)
-    top_docs = [doc for _, doc in reranked[:RERANK_TOP_N]]
+    # LLM reranking
+    top_scored_docs = llm_rerank(query, relevant_docs, RERANK_TOP_N)
+    top_docs = [doc for doc, _ in top_scored_docs]
 
     print(f"  [DB] Reranked → serving top {len(top_docs)} chunk(s) to LLM.")
 
@@ -154,7 +130,7 @@ def add_to_db(texts_by_url: Dict[str, str], entity: Optional[str] = None):
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
         length_function=len,
-        separators=["\n\n\n", "\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""],
+        separators=["\n# ", "\n## ", "\n### ", "\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""],
     )
 
     documents = []

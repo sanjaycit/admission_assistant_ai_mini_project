@@ -5,6 +5,7 @@ Run with: uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
 
 import sys
 from pathlib import Path
+import os
 
 # Ensure the backend directory is on the path so 'app' is a known package
 backend_dir = Path(__file__).resolve().parent.parent

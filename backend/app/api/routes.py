@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.core.web_rag import query_web_system, extract_query_entities, is_comparison_query
+from app.core.web_rag import query_web_system
+from app.core.entity_extractor import extract_query_entities
 
 router = APIRouter()
 
@@ -26,7 +27,8 @@ async def query_endpoint(body: QueryRequest):
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
     entities = extract_query_entities(question)
-    comparison = is_comparison_query(question)
+    lower = question.lower()
+    comparison = len(entities) >= 2 and any(t in lower for t in ["compare", "vs", "versus", "difference", "better", "which is", "both", "and"])
 
     # query_web_system is a blocking sync function (does web I/O + LLM calls).
     # Running it in a thread pool gives it its own event loop context so
