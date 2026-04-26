@@ -4,4 +4,9 @@ beautifulsoup4
 langchain
 langchain-community
 langchain-ollama
-faiss-cpu
+langchain-google-genai
+chromadb
+python-dotenv
+fastapi
+uvicorn[standard]
+nest_asyncio
