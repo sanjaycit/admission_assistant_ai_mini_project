@@ -1,10 +1,12 @@
 # Admission Assistant AI 🎓
 
-A full-stack, real-time Retrieval-Augmented Generation (RAG) platform that provides guidance on college admissions by dynamically answering questions on eligibility, required documents, and deadlines, along with offering a step-by-step checklist.
+A full-stack, real-time Retrieval-Augmented Generation (RAG) platform that provides guidance on college admissions by dynamically answering questions on eligibility, required documents, deadlines, fees, and offering a step-by-step checklist.
 
 ## Features
 
-- **Intelligent Admission Guidance**: Delivers precise answers related to college eligibility criteria, required documents, application deadlines, and admission processes.
+- **Intelligent Admission Guidance**: Delivers precise answers related to college eligibility criteria, required documents, application deadlines, fees, and admission processes.
+- **Guidance-Type Classification**: Every query is automatically classified into one of five categories — `eligibility`, `documents`, `deadlines`, `process`, or `fees` — so the LLM always generates a response formatted to match exactly what the student asked.
+- **Intent-Aware Cache Validation**: Before serving cached results, the system verifies the cached context actually aligns with the query's topic (e.g., ranking data is never served for a fees query), preventing silent cache misuse.
 - **Step-by-Step Checklists**: Automatically synthesizes structured, easy-to-follow checklists for prospective students based on targeted college requirements.
 - **Real-Time Web Scraping**: Dynamically fetches and extracts up-to-date admission procedures from university web pages using `trafilatura` and DuckDuckGo search.
 - **Smart RAG Pipeline**: Uses ChromaDB for vector caching with entity-aware searching to prevent cross-contamination when querying different colleges.
@@ -22,7 +24,7 @@ A full-stack, real-time Retrieval-Augmented Generation (RAG) platform that provi
 
 ## Architecture Overview
 
-The system employs an advanced Retrieval-Augmented Generation (RAG) architecture. When a student asks about a specific college's admission process, the backend attempts to answer using a local vector database (ChromaDB). If the specific data is missing or stale, the system falls back to live web scraping. The extracted data is ingested, vectorized using Ollama, and cached before a generative AI (Google Gemini) synthesizes the final step-by-step response and cites its sources.
+The system employs an advanced Retrieval-Augmented Generation (RAG) architecture. When a student asks about a specific college, the backend first classifies the query into a guidance type (`eligibility`, `documents`, `deadlines`, `process`, or `fees`). It then attempts to answer using a local vector database (ChromaDB), but only if the cached context is verified to be aligned with the query's topic. If the context is missing, stale, or mismatched, the system falls back to live web scraping. The extracted data is ingested, vectorized using Ollama, and cached before Google Gemini synthesizes the final response in the appropriate format (structured guide, comparison table, or concise factual answer) and cites its sources.
 
 ### Architecture Diagram
 
@@ -35,22 +37,24 @@ sequenceDiagram
     participant DB as ChromaDB Cache
     participant Web as DuckDuckGo & Scraper
 
-    U->>API: Asks about Eligibility, Deadlines, or Checklists
+    U->>API: Asks about Eligibility / Fees / Deadlines / Documents / Process
     API->>RAG: Extract target College Entity
-    RAG->>LLM: Analyze Intent (Checklist / Factual)
-    LLM-->>RAG: Returns query map
-    RAG->>DB: Search Vector Cache (Similarity K=8)
-    
-    alt Cache Miss / Stale Data
-        DB-->>RAG: No valid data found
-        RAG->>Web: Search specific URLs (Admissions/Deadlines) & Scrape
+    RAG->>LLM: Analyze Query → rewritten_query + is_comparison + admission_guidance_type
+    LLM-->>RAG: Returns {rewritten_query, is_comparison, admission_guidance_type}
+    RAG->>DB: Search Vector Cache (entity-filtered, Similarity K=8)
+
+    alt Cache Hit — intent aligned
+        DB-->>RAG: Return pre-processed context chunks
+        RAG->>RAG: is_query_context_aligned() → passes
+        RAG->>LLM: Synthesize Answer (mode: guidance type or factual)
+    else Cache Miss / Stale / Mismatched intent
+        DB-->>RAG: No valid data / context mismatch detected
+        RAG->>Web: Targeted Search & Scrape
         Web-->>RAG: Return clean text chunks
         RAG->>DB: Store new chunks in Vector DB
-    else Cache Hit
-        DB-->>RAG: Return pre-processed context arrays
+        RAG->>LLM: Synthesize Answer with fresh context
     end
 
-    RAG->>LLM: Synthesize Step-by-Step Answer + Citations
     LLM-->>API: Markdown Formatted Response
     API-->>U: Display Results, Checklists & Live Links
 ```
@@ -61,14 +65,16 @@ sequenceDiagram
 graph TD
     A[Student Query via UI] --> B[FastAPI Endpoint]
     B --> C[Entity Extraction & Alias Mapping]
-    C --> D[LLM Intent Analysis]
+    C --> D["LLM Analysis → admission_guidance_type + is_comparison"]
     D --> E{ChromaDB Cache Hit?}
-    E -- Yes --> G[LLM Checklist Synthesis]
-    E -- No --> F[DuckDuckGo Search & Trafilatura Scraper]
-    F --> H[Save Admission Criteria to Vector DB]
-    H --> G
-    G --> I[Markdown Response + Inline Citations]
-    I --> J[Display to Student]
+    E -- Yes --> F{"is_query_context_aligned?"}
+    F -- No --> G[DuckDuckGo Search & Trafilatura Scraper]
+    F -- Yes --> H["Generate Answer (mode: guidance type)"]
+    E -- No --> G
+    G --> I[Save Chunks to Vector DB]
+    I --> H
+    H --> J[Markdown Response + Inline Citations]
+    J --> K[Display to Student]
 ```
 
 ## Setup Steps
