@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.core.config import GEMINI_MODEL
 
+load_dotenv(override=True)
+
 def _get_llm(temperature: float = 0.0) -> ChatGoogleGenerativeAI:
-    load_dotenv(override=True)
     return ChatGoogleGenerativeAI(
         model=GEMINI_MODEL,
         temperature=temperature,

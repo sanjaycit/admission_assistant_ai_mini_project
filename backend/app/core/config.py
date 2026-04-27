@@ -8,7 +8,8 @@ Configuration constants and settings for the application.
 EMBED_MODEL = "mxbai-embed-large"
 # EMBED_MODEL = "models/gemini-embedding-001"
 GEMINI_MODEL = "gemini-2.5-flash"
-
+# GEMINI_MODEL = "gemini-2.5-pro"
+# GEMINI_MODEL = "gemma-4-31b-it"
 # Text Chunking Configuration
 # Smaller chunks provide more precise, fact-focused retrieval
 CHUNK_SIZE = 350
