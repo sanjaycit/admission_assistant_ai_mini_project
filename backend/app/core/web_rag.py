@@ -48,7 +48,6 @@ def is_query_context_aligned(query: str, context: str) -> bool:
 def _resolve_entity_context(
     entity: str | None,
     clean_query: str,
-    intent: str = "vague"
 ) -> tuple[str, list[str]] | None:
     """
     For a single entity: check cache, fall back to web, return (context, sources).
@@ -75,7 +74,7 @@ def _resolve_entity_context(
         # (user typed an unknown name in lowercase) just use the raw query —
         # it already contains enough signal for the search engine.
         targeted_query = f"{entity} {clean_query}" if entity else clean_query
-        results = search_web(targeted_query, intent=intent, num_results=5)
+        results = search_web(targeted_query, num_results=5)
         urls = [r["url"] for r in results if r.get("url")]
 
         if not urls:
@@ -116,7 +115,7 @@ def query_web_system(query: str) -> str:
     entities = extract_query_entities(query)
     
     # Step 2 — Analyze & expand the query via LLM
-    clean_query, intent, is_comparison = analyze_query(query)
+    clean_query, is_comparison, admission_guidance_type = analyze_query(query)
     
     # Fallback to rule-based if LLM didn't detect comparison but we have 2+ entities and keywords
     if not is_comparison and len(entities) >= 2 and any(t in query.lower() for t in ["compare", "vs", "versus", "difference"]):
@@ -124,6 +123,8 @@ def query_web_system(query: str) -> str:
 
     if is_comparison:
         print(f"  [ROUTER] Comparison query detected. Entities: {entities}")
+    elif admission_guidance_type:
+        print(f"  [ROUTER] Admission guidance query detected — type: '{admission_guidance_type}'.")
     elif entities:
         print(f"  [ENTITY] Detected college entity: '{entities[0]}'")
     else:
@@ -135,7 +136,7 @@ def query_web_system(query: str) -> str:
         all_sources = []
 
         for ent in entities:
-            result = _resolve_entity_context(ent, clean_query, intent)
+            result = _resolve_entity_context(ent, clean_query)
             if result:
                 ctx, srcs = result
                 merged_context_parts.append(f"### {ent.upper()} ###\n{ctx}")
@@ -157,13 +158,13 @@ def query_web_system(query: str) -> str:
             context_with_sources += f"[{i}] {src}\n"
         context_with_sources += "\nCONTEXT DATA:\n" + "\n\n".join(merged_context_parts)
         
-        answer = generate_answer(clean_query, context_with_sources, intent)
+        answer = generate_answer(clean_query, context_with_sources, is_comparison=True, admission_guidance_type=None)
         src_text = "\n".join(f"[{i}] {s}" for i, s in enumerate(sources, 1))
         return f"{answer}\n\n**Sources:**\n{src_text}"
 
     # Single-entity path
     entity = entities[0] if entities else None
-    result = _resolve_entity_context(entity, clean_query, intent)
+    result = _resolve_entity_context(entity, clean_query)
 
     if not result:
         return "Could not retrieve relevant context from the processed web pages."
@@ -176,6 +177,6 @@ def query_web_system(query: str) -> str:
         context_with_sources += f"[{i}] {src}\n"
     context_with_sources += "\nCONTEXT DATA:\n" + context
     
-    answer = generate_answer(clean_query, context_with_sources, intent)
+    answer = generate_answer(clean_query, context_with_sources, is_comparison=False, admission_guidance_type=admission_guidance_type)
     src_text = "\n".join(f"[{i}] {s}" for i, s in enumerate(sources, 1))
     return f"{answer}\n\n**Sources:**\n{src_text}"

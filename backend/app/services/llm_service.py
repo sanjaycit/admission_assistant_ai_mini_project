@@ -16,28 +16,37 @@ def _get_llm(temperature: float = 0.0) -> ChatGoogleGenerativeAI:
         google_api_key=os.getenv("GOOGLE_API_KEY"),
     )
 
-def analyze_query(query: str) -> tuple[str, str, bool]:
+def analyze_query(query: str) -> tuple[str, bool, str | None]:
     """
     Analyzes the user's search query to determine search intent and structure.
-    
+
     Returns:
-        tuple[str, str, bool]: A tuple containing the rewritten search query, 
-        the intent type ('factual', 'process', 'comparison', 'vague'), 
-        and a boolean indicating if it is a comparison query.
+        tuple[str, bool, str | None]: A tuple containing:
+          - rewritten_query: search-engine-optimized version of the query
+          - is_comparison: True if the query compares two or more colleges
+          - admission_guidance_type: the specific type of admission guidance
+            being asked about, or None if not an admission guidance query.
+            One of: "eligibility" | "documents" | "deadlines" | "process" | "fees"
     """
     llm = _get_llm()
     prompt = f"""Analyze the following query regarding college admissions.
-Determine the intent (factual, process, comparison, or vague).
 Rewrite the query to be highly specific for a search engine, expanding acronyms and clarifying intent.
 Determine if it's a comparison query (true/false).
+Determine the admission_guidance_type — the specific category of admission guidance
+the user is asking about. Use exactly one of these values, or null if it doesn't fit:
+  - "eligibility"  → asking about minimum qualifications, marks, age, entrance exams required
+  - "documents"    → asking about required certificates, papers to submit
+  - "deadlines"    → asking about important dates, last date to apply, schedule
+  - "process"      → asking about steps to apply, how to apply, checklist, procedure
+  - "fees"         → asking about tuition fees, course fees, hostel charges, or total cost
 
 Query: {query}
 
 Output JSON ONLY:
 {{
     "rewritten_query": "...",
-    "intent": "factual",
-    "is_comparison": false
+    "is_comparison": false,
+    "admission_guidance_type": null
 }}"""
     try:
         response = llm.invoke(prompt)
@@ -47,10 +56,15 @@ Output JSON ONLY:
         elif text.startswith("```"):
             text = text[3:-3]
         result = json.loads(text)
-        return result.get("rewritten_query", query), result.get("intent", "vague"), result.get("is_comparison", False)
+        return (
+            result.get("rewritten_query", query),
+            result.get("is_comparison", False),
+            result.get("admission_guidance_type") or None,
+        )
     except Exception as e:
         print(f"  [LLM] analyze_query failed: {e}")
-        return query, "vague", False
+        return query, False, None
+
 
 def is_context_sufficient(query: str, context: str) -> bool:
     """
@@ -75,15 +89,25 @@ Context:
     except Exception:
         return False
 
-def generate_answer(query: str, context: str, intent: str = "factual") -> str:
+def generate_answer(
+    query: str,
+    context: str,
+    is_comparison: bool = False,
+    admission_guidance_type: str | None = None,
+) -> str:
     """
     Generates the final response using the Gemini model.
-    The response format is determined dynamically by the intent type.
+    The response format is determined by is_comparison and admission_guidance_type:
+      - is_comparison=True              → Markdown comparison table
+      - admission_guidance_type not None → Structured guidance (eligibility /
+                                          documents / deadlines / process)
+      - otherwise                       → Concise factual answer
     """
-    print(f"  [GENERATE] Generating answer from {len(context)} chars of context (intent: {intent})...")
+    mode = "comparison" if is_comparison else (admission_guidance_type or "factual")
+    print(f"  [GENERATE] Generating answer from {len(context)} chars of context (mode: {mode})...")
     llm = _get_llm()
 
-    if intent == "process":
+    if admission_guidance_type is not None and not is_comparison:
         prompt = f"""### TASK
 Read the CONTEXT below and answer the QUESTION with a well-structured guide.
 Use only information present in the context.
@@ -122,7 +146,7 @@ Structure your answer using only the relevant sections below:
 - Do NOT add caveats or say you don't know.
 
 ### ANSWER"""
-    elif intent == "comparison":
+    elif is_comparison:
         prompt = f"""### TASK
 Read the CONTEXT below and answer the QUESTION by comparing the entities.
 The context is from trusted web sources.
