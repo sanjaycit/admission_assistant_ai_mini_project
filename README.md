@@ -115,6 +115,22 @@ sequenceDiagram
     API-->>U: Display Results & Live Links
 ```
 
+### System Pipeline (Flowchart)
+
+```mermaid
+graph TD
+    A[User Query via React UI] --> B[FastAPI Endpoint]
+    B --> C[Entity Extraction & Alias Mapping]
+    C --> D[LLM Intent Analysis]
+    D --> E{ChromaDB Cache Hit?}
+    E -- Yes --> G[LLM Answer Synthesis]
+    E -- No --> F[DuckDuckGo Search & Trafilatura Scraper]
+    F --> H[Save Chunks to Vector DB]
+    H --> G
+    G --> I[Markdown Response + Citations]
+    I --> J[Display to User]
+```
+
 ### Flow Breakdown:
 1. **Entity Extraction**: The user query is passed through a regex-based alias normaliser to standardise college names.
 2. **Intent Analysis**: The LLM evaluates user intent (`factual`, `process`, or `comparison`).
