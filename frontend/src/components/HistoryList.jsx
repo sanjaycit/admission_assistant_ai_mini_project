@@ -19,15 +19,6 @@ export default function HistoryList({ history }) {
             {item.question}
           </div>
           <div className="history-answer">{item.result.answer}</div>
-          <div className="history-answer-meta">
-            {item.result.mode === 'web'
-              ? <span className="badge badge-mode-web">Live Web</span>
-              : <span className="badge badge-mode-cache">Cache</span>
-            }
-            {item.result.is_comparison && (
-              <span className="badge badge-comparison">Comparison</span>
-            )}
-          </div>
         </div>
       ))}
     </section>

@@ -4,7 +4,7 @@
  * Supports structured markdown: ## headings, - [ ] checkboxes, 1. numbered lists, **bold**
  */
 
-import { useState } from 'react'
+
 
 /* ── Inline markdown renderer (no external library) ────────────────────── */
 function renderInline(text) {
@@ -19,37 +19,18 @@ function renderInline(text) {
 }
 
 function MarkdownAnswer({ text }) {
-  const [checked, setChecked] = useState({})
-
-  const toggleCheck = (id) =>
-    setChecked((prev) => ({ ...prev, [id]: !prev[id] }))
-
   const lines = text.split('\n')
   const nodes = []
-  let listBuffer = []   // accumulate consecutive list items
-  let listType = null   // 'ul' | 'ol' | 'checklist'
+  let listBuffer = []
+  let listType = null  // 'ol' | 'ul'
   let listKey = 0
 
   function flushList() {
     if (!listBuffer.length) return
-    if (listType === 'checklist') {
-      nodes.push(
-        <ul key={`list-${listKey++}`} className="md-checklist">
-          {listBuffer}
-        </ul>
-      )
-    } else if (listType === 'ol') {
-      nodes.push(
-        <ol key={`list-${listKey++}`} className="md-ol">
-          {listBuffer}
-        </ol>
-      )
+    if (listType === 'ol') {
+      nodes.push(<ol key={`list-${listKey++}`} className="md-ol">{listBuffer}</ol>)
     } else {
-      nodes.push(
-        <ul key={`list-${listKey++}`} className="md-ul">
-          {listBuffer}
-        </ul>
-      )
+      nodes.push(<ul key={`list-${listKey++}`} className="md-ul">{listBuffer}</ul>)
     }
     listBuffer = []
     listType = null
@@ -61,34 +42,15 @@ function MarkdownAnswer({ text }) {
     // ## Section heading
     if (/^##\s+/.test(line)) {
       flushList()
-      nodes.push(
-        <h3 key={idx} className="md-heading">
-          {renderInline(line.replace(/^##\s+/, ''))}
-        </h3>
-      )
+      nodes.push(<h3 key={idx} className="md-heading">{renderInline(line.replace(/^##\s+/, ''))}</h3>)
       return
     }
 
-    // - [ ] or - [x] checkbox item
-    const checkMatch = line.match(/^- \[( |x)\]\s+(.+)/)
+    // - [ ] or - [x] checkbox → treat as numbered list item
+    const checkMatch = line.match(/^- \[[ x]\]\s+(.+)/)
     if (checkMatch) {
-      if (listType !== 'checklist') { flushList(); listType = 'checklist' }
-      const id = `chk-${idx}`
-      const isChecked = checked[id] ?? (checkMatch[1] === 'x')
-      listBuffer.push(
-        <li key={idx} className={`md-check-item${isChecked ? ' checked' : ''}`}>
-          <label className="md-check-label">
-            <input
-              type="checkbox"
-              className="md-checkbox"
-              checked={isChecked}
-              onChange={() => toggleCheck(id)}
-              aria-label={checkMatch[2]}
-            />
-            <span className="md-check-text">{renderInline(checkMatch[2])}</span>
-          </label>
-        </li>
-      )
+      if (listType !== 'ol') { flushList(); listType = 'ol' }
+      listBuffer.push(<li key={idx} className="md-li">{renderInline(checkMatch[1])}</li>)
       return
     }
 
@@ -96,11 +58,7 @@ function MarkdownAnswer({ text }) {
     const numMatch = line.match(/^(\d+)\.\s+(.+)/)
     if (numMatch) {
       if (listType !== 'ol') { flushList(); listType = 'ol' }
-      listBuffer.push(
-        <li key={idx} className="md-li">
-          {renderInline(numMatch[2])}
-        </li>
-      )
+      listBuffer.push(<li key={idx} className="md-li">{renderInline(numMatch[2])}</li>)
       return
     }
 
@@ -108,15 +66,11 @@ function MarkdownAnswer({ text }) {
     const bulletMatch = line.match(/^[-*]\s+(.+)/)
     if (bulletMatch) {
       if (listType !== 'ul') { flushList(); listType = 'ul' }
-      listBuffer.push(
-        <li key={idx} className="md-li">
-          {renderInline(bulletMatch[1])}
-        </li>
-      )
+      listBuffer.push(<li key={idx} className="md-li">{renderInline(bulletMatch[1])}</li>)
       return
     }
 
-    // Blank line — flush pending list, add spacing
+    // Blank line
     if (!line.trim()) {
       flushList()
       nodes.push(<div key={idx} className="md-spacer" />)
@@ -125,11 +79,7 @@ function MarkdownAnswer({ text }) {
 
     // Plain paragraph
     flushList()
-    nodes.push(
-      <p key={idx} className="md-para">
-        {renderInline(line)}
-      </p>
-    )
+    nodes.push(<p key={idx} className="md-para">{renderInline(line)}</p>)
   })
 
   flushList()
