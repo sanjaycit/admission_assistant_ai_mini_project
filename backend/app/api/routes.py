@@ -1,3 +1,6 @@
+"""
+API routing module handling FastAPI endpoints for the RAG system.
+"""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.core.web_rag import query_web_system

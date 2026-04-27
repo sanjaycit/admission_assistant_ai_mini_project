@@ -1,3 +1,6 @@
+"""
+Module for extracting, normalizing, and resolving college entity names from user queries.
+"""
 import re
 
 # ---------------------------------------------------------------------------

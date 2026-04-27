@@ -1,16 +1,18 @@
-# config.py - Configuration constants and settings
+"""
+Configuration constants and settings for the application.
+"""
 
-# LLM settings
-# EMBED_MODEL = "nomic-embed-text"  # Ollama — stays local for embeddings
-EMBED_MODEL = "models/gemini-embedding-001" # Gemini embedding model
-GEMINI_MODEL = "gemini-2.5-flash"  # works on v1beta endpoint langchain uses
-# LLM_MODEL = "gemma:2b"               # Ollama local model (too small fo
+# LLM Models Configuration
+# Local option: EMBED_MODEL = "nomic-embed-text"
+# Local option: LLM_MODEL = "gemma:2b"
+EMBED_MODEL = "models/gemini-embedding-001"
+GEMINI_MODEL = "gemini-2.5-flash"
 
-# --- Chunk Quality (Fix 2) ---
-# Smaller chunks = more precise, fact-focused retrieval
-CHUNK_SIZE = 350          # ~300-400 tokens; tight paragraph-level chunks
-CHUNK_OVERLAP = 80        # Overlap preserves sentence boundaries across chunks
+# Text Chunking Configuration
+# Smaller chunks provide more precise, fact-focused retrieval
+CHUNK_SIZE = 350
+CHUNK_OVERLAP = 80
 
-# --- Retrieval Width (Fix 4) ---
-# Retrieve more candidates and let the LLM reranker filter to the best
-SIMILARITY_K = 8          # Fetch 8 candidates directly to save tokens
+# Retrieval Configuration
+# Number of top candidate chunks to fetch from the vector database
+SIMILARITY_K = 8

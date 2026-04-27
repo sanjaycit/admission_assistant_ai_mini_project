@@ -1,3 +1,6 @@
+"""
+Core Retrieval-Augmented Generation (RAG) pipeline router and sequence orchestration logic.
+"""
 import asyncio
 from app.core.config import SIMILARITY_K
 from app.services.web_search import search_web
@@ -90,9 +93,7 @@ def query_web_system(query: str) -> str:
     else:
         print("  [ENTITY] No specific college detected — searching without entity filter.")
 
-    # ────────────────────────────────────────────────────────────
-    # Comparison path: resolve context for EACH entity, merge
-    # ────────────────────────────────────────────────────────────
+    # Comparison path: resolve context for each entity and merge results
     if is_comparison:
         merged_context_parts = []
         all_sources = []
@@ -124,9 +125,7 @@ def query_web_system(query: str) -> str:
         src_text = "\n".join(f"[{i}] {s}" for i, s in enumerate(sources, 1))
         return f"{answer}\n\n**Sources:**\n{src_text}"
 
-    # ────────────────────────────────────────────────────────────
-    # Single-entity path (original flow)
-    # ────────────────────────────────────────────────────────────
+    # Single-entity path
     entity = entities[0] if entities else None
     result = _resolve_entity_context(entity, clean_query, intent)
 

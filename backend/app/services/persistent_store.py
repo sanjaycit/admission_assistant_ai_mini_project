@@ -1,3 +1,6 @@
+"""
+Module managing Vector storage (ChromaDB), caching, and distance-based document retrieval.
+"""
 import os
 import time
 from typing import Dict, Tuple, List, Optional
@@ -10,8 +13,8 @@ from app.core.config import EMBED_MODEL, SIMILARITY_K, CHUNK_SIZE, CHUNK_OVERLAP
 # Define persistent storage path
 PERSIST_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "chroma_cache")
 
-# Freshness: cached chunks older than this (in seconds) are considered stale
-# 24 hours — fees/rankings change, so daily refresh is reasonable
+# Cache expiration time in seconds (Default: 24 hours).
+# Ensures information like fees and rankings remain up-to-date.
 CACHE_TTL_SECONDS = 86_400
 
 
@@ -42,13 +45,13 @@ def search_db(
     require_fresh: bool = False,
 ) -> Optional[Tuple[str, List[str]]]:
     """
-    Entity-aware search of the persistent DB.
+    Entity-aware search of the persistent ChromaDB cache.
 
-    entity  : college name extracted from the query (e.g. "ssn", "mit").
-              When provided, retrieval is FILTERED to only that college's chunks.
-              This prevents MIT chunks ever being returned for an SSN query.
+    If an entity is provided, the retrieval is filtered to only that college's chunks.
+    This strictly prevents cross-college data contamination.
 
-    Returns (context, sources) if relevant chunks are found, otherwise None.
+    Returns:
+        Optional[Tuple[str, List[str]]]: A tuple of formatting context and source URLs if found.
     """
     entity_label = f"'{entity}'" if entity else "any"
     print(f"  [DB] Checking persistent cache for relevant context (entity={entity_label})...")
@@ -58,9 +61,7 @@ def search_db(
         print("  [DB] Cache is empty.")
         return None
 
-    # ── Entity-filtered retrieval ─────────────────────────────────────────────
-    # ChromaDB `where` filter ensures ONLY chunks tagged with this college are
-    # returned — cross-college contamination is impossible at the DB level.
+    # Filter retrieval by entity to prevent cross-contamination of college data
     where_filter = {"college": {"$eq": entity}} if entity else None
 
     try:
@@ -115,10 +116,8 @@ def search_db(
 
 def add_to_db(texts_by_url: Dict[str, str], entity: Optional[str] = None):
     """
-    Chunk texts and store them in ChromaDB with entity metadata.
-
-    entity : college name (e.g. "ssn", "mit"). Tagged on every chunk so that
-             future retrievals can filter by college, preventing cross-contamination.
+    Splits the extracted texts into chunks and stores them in ChromaDB.
+    Associates each chunk with an optional entity name to enable filtered retrieval.
     """
     print(f"  [DB] Saving fetched content to persistent cache (entity='{entity}')...")
 
@@ -143,7 +142,7 @@ def add_to_db(texts_by_url: Dict[str, str], entity: Optional[str] = None):
             documents.append(chunk)
             metadata = {"source": url, "cached_at": now}
             if entity:
-                metadata["college"] = entity  # ← entity tag on every chunk
+                metadata["college"] = entity
             metadatas.append(metadata)
 
     if not documents:

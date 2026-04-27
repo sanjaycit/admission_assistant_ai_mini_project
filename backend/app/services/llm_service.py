@@ -1,3 +1,6 @@
+"""
+Module providing LLM integration via LangChain for query analysis and answer generation.
+"""
 import os
 import json
 from typing import List, Tuple
@@ -15,9 +18,12 @@ def _get_llm(temperature: float = 0.0) -> ChatGoogleGenerativeAI:
 
 def analyze_query(query: str) -> tuple[str, str, bool]:
     """
-    Uses Gemini to analyze the user's query.
-    Returns: (rewritten_query, intent, is_comparison)
-    intent can be: 'factual', 'process', 'comparison', 'vague'
+    Analyzes the user's search query to determine search intent and structure.
+    
+    Returns:
+        tuple[str, str, bool]: A tuple containing the rewritten search query, 
+        the intent type ('factual', 'process', 'comparison', 'vague'), 
+        and a boolean indicating if it is a comparison query.
     """
     llm = _get_llm()
     prompt = f"""Analyze the following query regarding college admissions.
@@ -48,7 +54,7 @@ Output JSON ONLY:
 
 def is_context_sufficient(query: str, context: str) -> bool:
     """
-    Use LLM to validate if context has enough information.
+    Uses the LLM model to validate if the cached context provides enough information.
     """
     llm = _get_llm()
     prompt = f"""Evaluate if the following context contains enough factual information to accurately answer the user's query.
@@ -70,7 +76,10 @@ Context:
         return False
 
 def generate_answer(query: str, context: str, intent: str = "factual") -> str:
-    """Generate final answer using Gemini via LangChain."""
+    """
+    Generates the final response using the Gemini model.
+    The response format is determined dynamically by the intent type.
+    """
     print(f"  [GENERATE] Generating answer from {len(context)} chars of context (intent: {intent})...")
     llm = _get_llm()
 
@@ -156,7 +165,7 @@ Extract numbers, dollar amounts, and figures exactly as written.
     return response.content
 
 def llm_rerank(query: str, docs: List[Tuple], top_n: int) -> List[Tuple]:
-    """Use LLM to select the most relevant chunks."""
+    """Uses the LLM model to select and rerank the most relevant knowledge chunks."""
     if not docs:
         return []
     

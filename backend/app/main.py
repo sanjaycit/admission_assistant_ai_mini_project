@@ -1,3 +1,6 @@
+"""
+Command-line interface and entrypoint for testing the Web RAG system directly via CLI.
+"""
 # main.py - Main entrypoint for the Web RAG system
 
 import sys

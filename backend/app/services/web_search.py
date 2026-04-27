@@ -1,3 +1,6 @@
+"""
+Module for performing active web searches using DuckDuckGo to retrieve external information URLs.
+"""
 from typing import List, Dict
 
 # normalize_query has been moved to web_rag.py and uses an LLM
