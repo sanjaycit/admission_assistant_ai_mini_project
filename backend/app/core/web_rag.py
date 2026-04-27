@@ -13,6 +13,38 @@ from app.services.llm_service import analyze_query, generate_answer
 
 
 
+def is_query_context_aligned(query: str, context: str) -> bool:
+    """
+    Validates if the cached context actually aligns with the query's intent.
+    Prevents returning 'ranking' data when the user asked for 'cutoff'.
+    """
+    q_lower = query.lower()
+    c_lower = context.lower()
+
+    # Core data points
+    if "cutoff" in q_lower and "cutoff" not in c_lower:
+        return False
+    if "ranking" in q_lower and "rank" not in c_lower:
+        return False
+    if "fees" in q_lower and "fee" not in c_lower:
+        return False
+
+    # Admission Guidance (Eligibility, Documents, Deadlines, Process)
+    if any(w in q_lower for w in ["eligibility", "eligible"]) and not any(w in c_lower for w in ["eligibility", "eligible", "criteria"]):
+        return False
+    
+    if any(w in q_lower for w in ["document", "certificate"]) and not any(w in c_lower for w in ["document", "certificate"]):
+        return False
+        
+    if any(w in q_lower for w in ["deadline", "last date"]) and not any(w in c_lower for w in ["deadline", "date", "schedule"]):
+        return False
+        
+    if any(w in q_lower for w in ["process", "checklist", "step", "how to apply"]) and not any(w in c_lower for w in ["process", "step", "apply", "procedure", "checklist"]):
+        return False
+
+    return True
+
+
 def _resolve_entity_context(
     entity: str | None,
     clean_query: str,
@@ -30,8 +62,12 @@ def _resolve_entity_context(
 
     if cached:
         ctx, srcs = cached
-        print(f"  [ROUTER][{label}] Cache hit — using stored data.")
-        return ctx, srcs
+        if not is_query_context_aligned(clean_query, ctx):
+            print(f"  [ROUTER][{label}] Context mismatch → going to web")
+            cached = None
+        else:
+            print(f"  [ROUTER][{label}] Cache hit — using stored data.")
+            return ctx, srcs
 
     if not cached:
         print(f"  [ROUTER][{label}] Fetching from web...")

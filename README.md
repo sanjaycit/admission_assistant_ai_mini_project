@@ -11,6 +11,15 @@ A full-stack, real-time Retrieval-Augmented Generation (RAG) platform that provi
 - **FastAPI Backend**: A highly modular REST API architecture designed for concurrency and fast response times.
 - **React + Vite Frontend**: A fast, responsive user interface designed for a seamless student experience.
 
+## Why We Chose These Technologies
+
+- **FastAPI (Backend)**: College admission questions require rapid, asynchronous handling of web scraping and LLM generation simultaneously. FastAPI's native `asyncio` support guarantees extremely fast, non-blocking performance.
+- **React + Vite (Frontend)**: React effortlessly handles dynamic state updates for our chats, while Vite provides instant hot-module-reloading and lightning-fast production builds, ensuring a snappy student user experience.
+- **Google Gemini AI (LLM)**: Gemini proved exceptionally skilled at taking long, unstructured scraped paragraphs and synthesizing them directly into highly accurate, structured markdown step-by-step checklists.
+- **ChromaDB (Vector Database)**: We needed a fast, lightweight, and local vector cache. ChromaDB allows us to perform precise "Similarity Searches" instantly without the strict overhead or privacy concerns of an external database.
+- **Ollama (Embeddings)**: Used to generate textual embeddings 100% locally. This keeps the application highly cost-effective, bypassing the need to pay for tokenized external embedding APIs.
+- **Trafilatura & DuckDuckGo**: Instead of manually maintaining hardcoded data for hundreds of colleges, DuckDuckGo acts as an agile gateway to the live internet. Trafilatura dynamically strips away website menus, footers, and ads to yield clean text specifically for the LLM context.
+
 ## Architecture Overview
 
 The system employs an advanced Retrieval-Augmented Generation (RAG) architecture. When a student asks about a specific college's admission process, the backend attempts to answer using a local vector database (ChromaDB). If the specific data is missing or stale, the system falls back to live web scraping. The extracted data is ingested, vectorized using Ollama, and cached before a generative AI (Google Gemini) synthesizes the final step-by-step response and cites its sources.
