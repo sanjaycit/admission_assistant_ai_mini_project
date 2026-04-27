@@ -1,6 +1,6 @@
 /**
  * components/ResultCard.jsx
- * Renders the answer, source links, mode badge, entity tags, and optional debug panel.
+ * Renders the answer, source links, entity tags, and comparison badge.
  * Supports structured markdown: ## headings, - [ ] checkboxes, 1. numbered lists, **bold**
  */
 
@@ -137,11 +137,6 @@ function MarkdownAnswer({ text }) {
 }
 
 /* ── Sub-components ─────────────────────────────────────────────────────── */
-function ModeBadge({ mode }) {
-  if (mode === 'web') return <span className="badge badge-mode-web">Live Web</span>
-  return <span className="badge badge-mode-cache">Cache</span>
-}
-
 function SourcesPanel({ sources }) {
   if (!sources || sources.length === 0) return null
   return (
@@ -151,69 +146,27 @@ function SourcesPanel({ sources }) {
         <span className="sources-count">{sources.length}</span>
       </div>
       <ul className="sources-list" aria-label="Retrieved sources">
-        {sources.map((url, i) => {
-          let display = url
-          try { display = new URL(url).hostname.replace('www.', '') } catch (_) {}
-          return (
-            <li key={i} className="source-item">
-              <span className="source-num">{i + 1}</span>
-              <a href={url} target="_blank" rel="noopener noreferrer"
-                className="source-link" title={url}>
-                {url}
-              </a>
-              <span className="source-ext-icon" aria-hidden="true">↗</span>
-            </li>
-          )
-        })}
+        {sources.map((url, i) => (
+          <li key={i} className="source-item">
+            <span className="source-num">{i + 1}</span>
+            <a href={url} target="_blank" rel="noopener noreferrer"
+              className="source-link" title={url}>
+              {url}
+            </a>
+            <span className="source-ext-icon" aria-hidden="true">↗</span>
+          </li>
+        ))}
       </ul>
-    </div>
-  )
-}
-
-function DebugPanel({ result }) {
-  return (
-    <div className="debug-panel">
-      <div className="debug-panel-header">Debug Info</div>
-      <div className="debug-row">
-        <span className="debug-key">Mode</span>
-        <span className="debug-val">{result.mode}</span>
-      </div>
-      <div className="debug-row">
-        <span className="debug-key">Entities</span>
-        <span className="debug-val">
-          {result.entities?.length > 0 ? result.entities.join(', ') : '—'}
-        </span>
-      </div>
-      <div className="debug-row">
-        <span className="debug-key">Comparison</span>
-        <span className="debug-val">{result.is_comparison ? 'Yes' : 'No'}</span>
-      </div>
-      <div className="debug-row">
-        <span className="debug-key">Sources#</span>
-        <span className="debug-val">{result.sources?.length ?? 0}</span>
-      </div>
     </div>
   )
 }
 
 /* ── Main export ────────────────────────────────────────────────────────── */
 export default function ResultCard({ result }) {
-  const [showDebug, setShowDebug] = useState(false)
   if (!result) return null
 
   return (
     <div className="result-section">
-      {/* Meta badges */}
-      <div className="result-meta">
-        <ModeBadge mode={result.mode} />
-        {result.is_comparison && (
-          <span className="badge badge-comparison">Comparison</span>
-        )}
-        {result.entities?.map((e) => (
-          <span key={e} className="badge badge-entity">{e.toUpperCase()}</span>
-        ))}
-      </div>
-
       {/* Answer block */}
       <div className="answer-card">
         <div className="answer-card-header">
@@ -225,17 +178,6 @@ export default function ResultCard({ result }) {
 
       {/* Sources */}
       <SourcesPanel sources={result.sources} />
-
-      {/* Debug toggle */}
-      <button id="debug-toggle-btn" className="debug-toggle-btn"
-        onClick={() => setShowDebug((v) => !v)}
-        aria-expanded={showDebug} aria-controls="debug-panel">
-        {showDebug ? '▲ Hide debug' : '▼ Show debug info'}
-      </button>
-
-      {showDebug && (
-        <div id="debug-panel"><DebugPanel result={result} /></div>
-      )}
     </div>
   )
 }

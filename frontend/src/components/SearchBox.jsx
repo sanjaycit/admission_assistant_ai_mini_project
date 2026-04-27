@@ -6,11 +6,11 @@
 import { useState, useRef } from 'react'
 
 const SUGGESTIONS = [
-  'What is the admission fee for MIT?',
-  'Compare SSN and VIT rankings',
-  'Stanford admission deadline 2026',
-  'IIT Bombay tuition cost',
-  'Harvard acceptance rate 2025',
+  'What are the eligibility criteria for VIT Vellore?',
+  'What documents are required to apply to VIT?',
+  'What is the application deadline for VIT 2025?',
+  'What is the tuition fee for VIT Chennai?',
+  'How to apply to VIT step by step?',
 ]
 
 export default function SearchBox({ onSubmit, isLoading }) {
@@ -60,7 +60,7 @@ export default function SearchBox({ onSubmit, isLoading }) {
           ref={textareaRef}
           className="search-input"
           rows={1}
-          placeholder="e.g. What is the admission fee for MIT 2026?"
+          placeholder="e.g. What are the eligibility criteria for VIT Vellore?"
           value={value}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
