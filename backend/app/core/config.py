@@ -5,7 +5,8 @@ Configuration constants and settings for the application.
 # LLM Models Configuration
 # Local option: EMBED_MODEL = "nomic-embed-text"
 # Local option: LLM_MODEL = "gemma:2b"
-EMBED_MODEL = "models/gemini-embedding-001"
+EMBED_MODEL = "mxbai-embed-large"
+# EMBED_MODEL = "models/gemini-embedding-001"
 GEMINI_MODEL = "gemini-2.5-flash"
 
 # Text Chunking Configuration

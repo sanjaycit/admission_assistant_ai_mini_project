@@ -23,14 +23,24 @@ def main():
                 print(f"\n[FINAL ANSWER]\n{answer}")
             except Exception as e:
                 print(f"Error querying system: {e}")
+        elif sys.argv[1] == "inspect":
+            from app.services.persistent_store import get_db
+            try:
+                db = get_db()
+                count = db._collection.count()
+                print(f"\n[INSPECT] ChromaDB cache currently contains {count} stored chunk(s).")
+            except Exception as e:
+                print(f"Error inspecting database: {e}")
         else:
             print("Usage:")
             print("  python main.py query <question>  # Query the Web RAG system")
+            print("  python main.py inspect           # Inspect the ChromaDB vector storage")
     else:
         print("Hello students! Welcome to the College Admission Information System.")
         print("This system uses live Web Search + RAG to answer your questions.")
         print("\nUsage:")
         print("  python main.py query <question>")
+        print("  python main.py inspect")
         print("\nExample:")
         print("  python main.py query \"latest 2026 admission fee for Stanford\"")
 

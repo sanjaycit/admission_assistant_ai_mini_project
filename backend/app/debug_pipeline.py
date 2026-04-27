@@ -50,7 +50,7 @@ def banner(title: str):
     print(f"{'═'*60}")
 
 def result(label: str, value):
-    status = "✅" if value else "❌"
+    status = "[OK]" if value else "[FAIL]"
     print(f"  {status}  {label}: {value}")
 
 
@@ -63,13 +63,13 @@ for url in TEST_URLS:
         r = requests.get(url, headers=headers, timeout=15)
         if r.status_code == 200:
             raw_htmls[url] = r.text
-            print(f"  ✅  {url}")
+            print(f"  [OK]  {url}")
             print(f"       HTML size: {len(r.text):,} bytes")
         else:
-            print(f"  ❌  {url}  →  HTTP {r.status_code}")
+            print(f"  [FAIL]  {url}  →  HTTP {r.status_code}")
             raw_htmls[url] = ""
     except Exception as e:
-        print(f"  ❌  {url}  →  {e}")
+        print(f"  [FAIL]  {url}  →  {e}")
         raw_htmls[url] = ""
 
 
@@ -108,11 +108,11 @@ for url, html in raw_htmls.items():
         hits = [line.strip() for line in text.splitlines() if "fee" in line.lower() or "$" in line]
         if hits:
             for h in hits[:10]:
-                print(f"    ▶  {h}")
+                print(f"    >  {h}")
         else:
-            print("    ❌  NONE FOUND — extraction is likely the culprit!")
+            print("    [FAIL]  NONE FOUND — extraction is likely the culprit!")
     else:
-        print("  ❌  EMPTY TEXT — trafilatura extracted nothing!")
+        print("  [FAIL]  EMPTY TEXT — trafilatura extracted nothing!")
 
 
 # ─── Stage 3: Chunking ─────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ for url, text in extracted_texts.items():
             print(f"  [{i}] {fc[:300]}")
             print(SEPARATOR)
     else:
-        print("  ❌  NO FEE CHUNKS FOUND — chunking is eating the answer!")
+        print("  [FAIL]  NO FEE CHUNKS FOUND — chunking is eating the answer!")
         print("\n  ── First 5 chunks (for inspection) ──")
         for i, c in enumerate(chunks[:5], 1):
             print(f"  [{i}] {c[:200]}")
@@ -163,8 +163,8 @@ try:
     print(f"  Total documents in DB: {count}")
 
     if count == 0:
-        print("  ❌  DB is EMPTY — nothing has been stored yet!")
-        print("  ℹ️   Run 'python main.py query \"MIT fee\"' first, then re-run this script.")
+        print("  [FAIL]  DB is EMPTY — nothing has been stored yet!")
+        print("  [INFO]   Run 'python main.py query \"MIT fee\"' first, then re-run this script.")
     else:
         # Broad fetch to see what's there
         raw_results = db.similarity_search("fee cost tuition", k=10)
@@ -180,7 +180,7 @@ try:
             print(SEPARATOR)
 
 except Exception as e:
-    print(f"  ❌  Could not access DB: {e}")
+    print(f"  [FAIL]  Could not access DB: {e}")
 
 
 # ─── Stage 5: Retrieval Accuracy ───────────────────────────────────────────────
@@ -190,7 +190,7 @@ try:
     db = get_db()
 
     if db._collection.count() == 0:
-        print("  ❌  DB empty — skipping retrieval test.")
+        print("  [FAIL]  DB empty — skipping retrieval test.")
     else:
         for q in TEST_QUERIES:
             results = db.similarity_search_with_score(q, k=5)
@@ -207,19 +207,19 @@ try:
             print(f"  Best chunk: {best_text[:200]}")
 
 except Exception as e:
-    print(f"  ❌  Retrieval test failed: {e}")
+    print(f"  [FAIL]  Retrieval test failed: {e}")
 
 
 # ─── Verdict ──────────────────────────────────────────────────────────────────
 banner("DIAGNOSIS SUMMARY")
 print("""
-  Run the stages in order and look for the first ❌:
+  Run the stages in order and look for the first [FAIL]:
 
-  Stage 1 ❌  → Network issue (URL blocked or timeout)
-  Stage 2 ❌  → Extraction issue (trafilatura not finding content)
-  Stage 3 ❌  → Chunking destroys answer (try smaller chunks)
-  Stage 4 ❌  → DB empty or chunks don't contain fee info (store quality)
-  Stage 5 ❌  → Retrieval mismatch (embedding space / query mismatch)
+  Stage 1 [FAIL]  → Network issue (URL blocked or timeout)
+  Stage 2 [FAIL]  → Extraction issue (trafilatura not finding content)
+  Stage 3 [FAIL]  → Chunking destroys answer (try smaller chunks)
+  Stage 4 [FAIL]  → DB empty or chunks don't contain fee info (store quality)
+  Stage 5 [FAIL]  → Retrieval mismatch (embedding space / query mismatch)
 
-  If all ✅ → issue is in the LLM prompt or context assembly.
+  If all [OK] → issue is in the LLM prompt or context assembly.
 """)
