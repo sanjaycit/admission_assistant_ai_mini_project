@@ -5,8 +5,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 # from langchain_ollama import OllamaEmbeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from app.core.config import EMBED_MODEL, SIMILARITY_K, CHUNK_SIZE, CHUNK_OVERLAP, RERANK_TOP_N, GEMINI_MODEL
-from app.services.llm_service import llm_rerank
+from app.core.config import EMBED_MODEL, SIMILARITY_K, CHUNK_SIZE, CHUNK_OVERLAP, GEMINI_MODEL
 
 # Define persistent storage path
 PERSIST_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "chroma_cache")
@@ -90,13 +89,10 @@ def search_db(
         print("  [DB] All cached chunks are stale. Proceeding to web search.")
         return None
 
-    print(f"  [DB] Found {len(relevant_docs)} candidate chunk(s). Running LLM reranker...")
-
-    # LLM reranking
-    top_scored_docs = llm_rerank(query, relevant_docs, RERANK_TOP_N)
-    top_docs = [doc for doc, _ in top_scored_docs]
-
-    print(f"  [DB] Reranked → serving top {len(top_docs)} chunk(s) to LLM.")
+    print(f"  [DB] Found {len(relevant_docs)} candidate chunk(s).")
+    
+    # We no longer run LLM reranker; just take the top K documents
+    top_docs = [doc for doc, _ in relevant_docs]
 
     context_parts = []
     sources = set()

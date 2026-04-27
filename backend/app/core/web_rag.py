@@ -5,7 +5,7 @@ from app.services.web_scraper import fetch_all_urls, clean_html
 from app.services.persistent_store import search_db, add_to_db
 
 from app.core.entity_extractor import extract_query_entities
-from app.services.llm_service import analyze_query, is_context_sufficient, generate_answer
+from app.services.llm_service import analyze_query, generate_answer
 
 
 
@@ -27,12 +27,8 @@ def _resolve_entity_context(
 
     if cached:
         ctx, srcs = cached
-        if is_context_sufficient(clean_query, ctx):
-            print(f"  [ROUTER][{label}] Cache hit — using stored data.")
-            return ctx, srcs
-        else:
-            print(f"  [ROUTER][{label}] Cache insufficient — going to web.")
-            cached = None
+        print(f"  [ROUTER][{label}] Cache hit — using stored data.")
+        return ctx, srcs
 
     if not cached:
         print(f"  [ROUTER][{label}] Fetching from web...")

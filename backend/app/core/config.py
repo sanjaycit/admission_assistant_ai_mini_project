@@ -13,5 +13,4 @@ CHUNK_OVERLAP = 80        # Overlap preserves sentence boundaries across chunks
 
 # --- Retrieval Width (Fix 4) ---
 # Retrieve more candidates and let the LLM reranker filter to the best
-SIMILARITY_K = 30         # Fetch 30 candidates → LLM reranker picks top
-RERANK_TOP_N = 5          # Final chunks passed to LLM for answer generation
+SIMILARITY_K = 8          # Fetch 8 candidates directly to save tokens
